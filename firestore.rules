@@ -1,0 +1,116 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default-deny all paths by default
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidConversation(data) {
+      return data.ownerId is string &&
+        data.ownerId.size() <= 128 &&
+        data.ownerId == request.auth.uid &&
+        data.title is string &&
+        data.title.size() <= 120 &&
+        data.createdAt is timestamp &&
+        data.createdAt <= request.time &&
+        data.createdAt >= request.time - duration.value(300, 's') &&
+        data.updatedAt is timestamp &&
+        data.updatedAt <= request.time &&
+        data.updatedAt >= request.time - duration.value(300, 's');
+    }
+
+    // Client-created messages can ONLY have role == 'user'
+    function isValidUserMessage(data, convId) {
+      return data.ownerId is string &&
+        data.ownerId.size() <= 128 &&
+        data.ownerId == request.auth.uid &&
+        data.conversationId == convId &&
+        data.role == 'user' &&
+        data.content is string &&
+        data.content.size() > 0 &&
+        data.content.size() <= 10000 &&
+        data.createdAt is timestamp &&
+        data.createdAt <= request.time &&
+        data.createdAt >= request.time - duration.value(300, 's');
+    }
+
+    match /conversations/{conversationId} {
+      // List conversations only belonging to current user
+      allow list: if isSignedIn() && resource.data.ownerId == request.auth.uid;
+
+      // Get single conversation
+      allow get: if isSignedIn() && isValidId(conversationId) && resource.data.ownerId == request.auth.uid;
+
+      // Create conversation
+      allow create: if isSignedIn() &&
+        isValidId(conversationId) &&
+        isValidConversation(incoming()) &&
+        incoming().keys().hasAll(['ownerId', 'title', 'createdAt', 'updatedAt']) &&
+        incoming().keys().size() == 4;
+
+      // Update conversation: Client updates title and/or updatedAt
+      allow update: if isSignedIn() &&
+        isValidId(conversationId) &&
+        resource.data.ownerId == request.auth.uid &&
+        incoming().ownerId == existing().ownerId &&
+        incoming().createdAt == existing().createdAt &&
+        isValidConversation(incoming()) &&
+        incoming().diff(existing()).affectedKeys().hasOnly(['title', 'updatedAt']);
+
+      // Direct client deletion of conversations is forbidden.
+      // Deletions MUST be processed through the server API (DELETE /api/conversations/:id)
+      // to ensure secure cascade and orphan message cleanup.
+      allow delete: if false;
+
+      // Messages subcollection
+      match /messages/{messageId} {
+        // List messages of this conversation for the owner of the parent conversation
+        allow list: if isSignedIn() &&
+          get(/databases/$(database)/documents/conversations/$(conversationId)).data.ownerId == request.auth.uid;
+
+        // Get single message
+        allow get: if isSignedIn() &&
+          isValidId(messageId) &&
+          (get(/databases/$(database)/documents/conversations/$(conversationId)).data.ownerId == request.auth.uid ||
+           resource.data.ownerId == request.auth.uid);
+
+        // Create message: verify parent conversation exists and belongs to auth user.
+        // Client-side Firestore writes ONLY allow role == 'user'.
+        // The browser/client CANNOT create assistant messages.
+        allow create: if isSignedIn() &&
+          isValidId(messageId) &&
+          isValidId(conversationId) &&
+          get(/databases/$(database)/documents/conversations/$(conversationId)).data.ownerId == request.auth.uid &&
+          isValidUserMessage(incoming(), conversationId) &&
+          incoming().keys().hasAll(['ownerId', 'conversationId', 'role', 'content', 'createdAt']) &&
+          incoming().keys().size() == 5;
+
+        // Messages are immutable in journal; no update permitted
+        allow update: if false;
+
+        // Direct client deletion of messages is forbidden.
+        // Message deletions are handled exclusively via server cascade during page removal.
+        allow delete: if false;
+      }
+    }
+  }
+}

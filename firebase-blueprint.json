@@ -1,0 +1,90 @@
+{
+  "entities": {
+    "Conversation": {
+      "title": "Conversation",
+      "description": "A single journal page representing a persistent conversation thread.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "description": "Unique identifier of the conversation."
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "description": "UID of the user who owns this journal page."
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 120,
+          "description": "Title or date summary of the journal page."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the page was created."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the page was last updated."
+        }
+      },
+      "required": ["ownerId", "title", "createdAt", "updatedAt"]
+    },
+    "Message": {
+      "title": "Message",
+      "description": "An individual entry or AI response in a journal conversation.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "description": "Unique identifier of the message."
+        },
+        "conversationId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "description": "ID of the parent conversation."
+        },
+        "ownerId": {
+          "type": "string",
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_-]+$",
+          "description": "UID of the owner user."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["user", "assistant"],
+          "description": "Author role of the message."
+        },
+        "content": {
+          "type": "string",
+          "maxLength": 10000,
+          "description": "Text content of the journal message or AI reflection."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Timestamp when the message was recorded."
+        }
+      },
+      "required": ["conversationId", "ownerId", "role", "content", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/conversations/{conversationId}": {
+      "schema": "#/entities/Conversation",
+      "description": "Collection of journal conversations owned by users."
+    },
+    "/conversations/{conversationId}/messages/{messageId}": {
+      "schema": "#/entities/Message",
+      "description": "Subcollection of messages inside a journal page."
+    }
+  }
+}
