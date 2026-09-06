@@ -23,8 +23,16 @@ if (getApps().length > 0) {
 } else {
   let credential = applicationDefault();
 
-  // Support server environment variable for service account if provided
-  if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  // Support server-side single-line base64-encoded service account secret
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_B64) {
+    try {
+      const decoded = Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_B64, 'base64').toString('utf8');
+      const parsed = JSON.parse(decoded);
+      credential = cert(parsed);
+    } catch {
+      // Retain applicationDefault() fallback without logging sensitive data
+    }
+  } else if (process.env.FIREBASE_SERVICE_ACCOUNT) {
     try {
       const parsed = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
       credential = cert(parsed);

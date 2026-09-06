@@ -10,6 +10,7 @@ import {
   getConversationHistory,
 } from '@/lib/server-firestore';
 import { evaluateSafetyGate, FIXED_SAFETY_RESPONSE } from '@/lib/safety-gate';
+import { evaluateIntervention, getSafeAckResponse } from '@/lib/selective-intervention';
 
 const ID_REGEX = /^[a-zA-Z0-9_-]{1,128}$/;
 const MAX_MESSAGE_LENGTH = 10000;
@@ -172,7 +173,69 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 8. FIX 1: Database-Authoritative Context Retrieval (Executed ONLY for non-triggered entries)
+    // 8. Persist the User's Journal Entry to Firestore (Zero Data Loss)
+    await persistMessage(
+      conversationId,
+      verifiedUser.uid,
+      'user',
+      message.trim(),
+      cleanUserMessageId
+    );
+
+    // 9. SELECTIVE INTERVENTION EVALUATOR (Phase 4)
+    // Invariant: Safety Gate has passed. Evaluator decides strictly: SILENCE | ACK | REFLECT
+    // Criterion: "Does responding help the user's processing?" (NOT engagement)
+    const apiKey = process.env.GEMINI_API_KEY;
+    const intervention = await evaluateIntervention(message, apiKey);
+
+    // Structured Operational Logging (Zero-PII, no journal content logged)
+    console.info(JSON.stringify({
+      event: 'selective_intervention_evaluated',
+      requestId,
+      uidPrefix: verifiedUser.uid.slice(0, 8),
+      conversationId: conversationId.slice(0, 16),
+      decision: intervention.decision,
+      fallbackUsed: intervention.fallbackUsed,
+      evalLatencyMs: intervention.latencyMs,
+    }));
+
+    if (intervention.decision === 'SILENCE') {
+      await updateConversationTimestamp(conversationId, verifiedUser.uid);
+      return NextResponse.json({
+        success: true,
+        conversationId,
+        userMessageId: cleanUserMessageId,
+        assistantMessage: null,
+        interventionDecision: 'SILENCE',
+      });
+    }
+
+    if (intervention.decision === 'ACK') {
+      const ackText = getSafeAckResponse();
+      const assistantMessageId = `msg_${crypto.randomUUID()}`;
+      await persistMessage(
+        conversationId,
+        verifiedUser.uid,
+        'assistant',
+        ackText,
+        assistantMessageId
+      );
+      await updateConversationTimestamp(conversationId, verifiedUser.uid);
+      return NextResponse.json({
+        success: true,
+        conversationId,
+        userMessageId: cleanUserMessageId,
+        assistantMessage: {
+          id: assistantMessageId,
+          role: 'assistant',
+          content: ackText,
+          createdAt: new Date().toISOString(),
+        },
+        interventionDecision: 'ACK',
+      });
+    }
+
+    // 10. Database-Authoritative Context Retrieval (Executed ONLY when REFLECT)
     // History is NEVER trusted from client. It is retrieved directly from Firestore.
     let storedHistory: any[] = [];
     if (!isNewConversation) {
@@ -195,17 +258,7 @@ export async function POST(req: NextRequest) {
       parts: [{ text: message.trim() }],
     });
 
-    // 9. Persist the User's Journal Entry to Firestore
-    await persistMessage(
-      conversationId,
-      verifiedUser.uid,
-      'user',
-      message.trim(),
-      cleanUserMessageId
-    );
-
-    // 10. Invoke Gemini Server-Side via @google/genai
-    const apiKey = process.env.GEMINI_API_KEY;
+    // 11. Invoke Gemini Server-Side via @google/genai (Executed ONLY when REFLECT)
     if (!apiKey) {
       console.error(JSON.stringify({
         event: 'gemini_config_error',
@@ -302,6 +355,7 @@ Guidelines:
         content: cleanedAssistantText,
         createdAt: new Date().toISOString(),
       },
+      interventionDecision: 'REFLECT',
     });
   } catch (error: any) {
     const latencyMs = Date.now() - startTime;
