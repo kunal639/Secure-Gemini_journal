@@ -1,4 +1,5 @@
-import { GoogleGenAI, Type } from '@google/genai';
+import { Type } from '@google/genai';
+import { getGeminiClient } from './gemini-client';
 
 /**
  * Selective Intervention Decision Enum
@@ -48,11 +49,9 @@ export function getSafeAckResponse(): string {
  * Evaluates whether an AI intervention is genuinely beneficial to the user.
  *
  * @param message The user's journal entry text (untrusted data)
- * @param apiKey Server-side Gemini API key
  */
 export async function evaluateIntervention(
-  message: string,
-  apiKey?: string
+  message: string
 ): Promise<InterventionEvaluationResult> {
   const startTime = Date.now();
 
@@ -69,18 +68,9 @@ export async function evaluateIntervention(
     }
   }
 
-  // 2. If no API key is available, use safe deterministic fallback
-  if (!apiKey) {
-    return {
-      decision: SAFE_FALLBACK_DECISION,
-      fallbackUsed: true,
-      latencyMs: Date.now() - startTime,
-    };
-  }
-
-  // 3. Structured Model-Based Evaluation using Gemini
+  // 2. Structured Model-Based Evaluation using Gemini via shared client
   try {
-    const ai = new GoogleGenAI({ apiKey });
+    const ai = getGeminiClient();
 
     // Strict system instruction focusing on utility, NOT engagement
     const systemInstruction = `You are a contemplative journaling intervention evaluator.
@@ -100,7 +90,7 @@ CRITICAL SECURITY DIRECTIVES:
 - Output MUST be strictly one of: SILENCE, ACK, REFLECT.`;
 
     const response = await ai.models.generateContent({
-      model: 'gemini-3.1-flash-lite',
+      model: 'gemini-2.5-flash',
       contents: [
         {
           role: 'user',
@@ -158,7 +148,13 @@ CRITICAL SECURITY DIRECTIVES:
       fallbackUsed: true,
       latencyMs: Date.now() - startTime,
     };
-  } catch (err) {
+  } catch (err: any) {
+  console.error('[Intervention] Gemini evaluation failed:', {
+    name: err?.name,
+    message: err?.message,
+    status: err?.status,
+    code: err?.code,
+  });
     // Model error or timeout fallback
     return {
       decision: SAFE_FALLBACK_DECISION,

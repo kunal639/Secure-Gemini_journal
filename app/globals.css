@@ -1,16 +1,17 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400..600;1,6..72,400;1,6..72,500&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Plus+Jakarta+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @layer base {
   :root {
-    --font-serif: 'Newsreader', Georgia, serif;
+    --font-serif: 'Lora', 'Charter', Georgia, serif;
     --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+    --font-mono: 'JetBrains Mono', monospace;
   }
 
   body {
     font-family: var(--font-sans);
-    background-color: #FAF9F5;
-    color: #262522;
+    background-color: #F4EFE6;
+    color: #1A1612;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -20,7 +21,31 @@
   font-family: var(--font-serif);
 }
 
-/* Custom subtle scrollbar for the journal view */
+.font-mono {
+  font-family: var(--font-mono);
+}
+
+/* Subtle, authentic ruled notebook paper pattern */
+.notebook-ruled {
+  background-color: #FAF8F2;
+  background-image: 
+    linear-gradient(90deg, transparent 79px, #DFD5C4 79px, #DFD5C4 81px, transparent 81px),
+    linear-gradient(#E8E1D1 1px, transparent 1px);
+  background-size: 100% 100%, 100% 32px;
+  background-position: 0 0, 0 8px;
+}
+
+@media (max-width: 640px) {
+  .notebook-ruled {
+    background-image: 
+      linear-gradient(90deg, transparent 39px, #DFD5C4 39px, #DFD5C4 40px, transparent 40px),
+      linear-gradient(#E8E1D1 1px, transparent 1px);
+    background-size: 100% 100%, 100% 28px;
+    background-position: 0 0, 0 6px;
+  }
+}
+
+/* Custom crisp scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
@@ -29,9 +54,9 @@
   background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-  background: #D8D4CA;
+  background: #CFC3B0;
   border-radius: 9999px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #B8B3A6;
+  background: #B3A48E;
 }

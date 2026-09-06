@@ -1,0 +1,17 @@
+[35m.env.example[m[36m:[m[32m1[m[36m:[m# [1;31mGEMINI_API_KEY[m: Required for Gemini AI API calls.
+[35m.env.example[m[36m:[m[32m4[m[36m:[m[1;31mGEMINI_API_KEY[m=""
+[35m.env.example[m[36m:[m[32m6[m[36m:[m# [1;31mFIREBASE_SERVICE_ACCOUNT[m_B64: Optional base64-encoded Firebase service account JSON for server-side Admin SDK operations.
+[35m.env.example[m[36m:[m[32m7[m[36m:[m[1;31mFIREBASE_SERVICE_ACCOUNT[m_B64=""
+[35mlib/firebase-admin.ts[m[36m:[m[32m27[m[36m:[m  if (process.env.[1;31mFIREBASE_SERVICE_ACCOUNT[m_B64) {
+[35mlib/firebase-admin.ts[m[36m:[m[32m29[m[36m:[m      const decoded = Buffer.from(process.env.[1;31mFIREBASE_SERVICE_ACCOUNT[m_B64, 'base64').toString('utf8');
+[35mlib/firebase-admin.ts[m[36m:[m[32m35[m[36m:[m  } else if (process.env.[1;31mFIREBASE_SERVICE_ACCOUNT[m) {
+[35mlib/firebase-admin.ts[m[36m:[m[32m37[m[36m:[m      const parsed = JSON.parse(process.env.[1;31mFIREBASE_SERVICE_ACCOUNT[m);
+[35mlib/server-auth.ts[m[36m:[m[32m5[m[36m:[m  new URL('https://www.googleapis.com/[1;31mservice_account[ms/v1/jwk/securetoken@system.gserviceaccount.com')
+[35mscripts/cleanup_firestore_secrets.mjs[m[36m:[m[32m45[m[36m:[m    const hasServerSecrets = serverFirestore.includes('serverAuthToken') || serverFirestore.includes('serverDeleteToken') || serverFirestore.includes('[1;31mSERVER_AUTH_SECRET[m');
+[35mscripts/test-adversarial-security.mjs[m[36m:[m[32m93[m[36m:[m  assert(process.env.[1;31mGEMINI_API_KEY[m && process.env.[1;31mGEMINI_API_KEY[m.length > 10, '4.1 Server environment holds [1;31mGEMINI_API_KEY[m securely');
+[35mscripts/test-adversarial-security.mjs[m[36m:[m[32m94[m[36m:[m  assert(!process.env.NEXT_PUBLIC_[1;31mGEMINI_API_KEY[m, '4.2 [1;31mGEMINI_API_KEY[m is NOT exposed as NEXT_PUBLIC_ client secret');
+[35mscripts/test_hardening_invariants.mjs[m[36m:[m[32m163[m[36m:[m    assert(!rulesContent.includes("[1;31mSERVER_AUTH_SECRET[m"), "rules must NOT reference [1;31mSERVER_AUTH_SECRET[m");
+[35mscripts/test_live_security_audit.mjs[m[36m:[m[32m79[m[36m:[m    assert(!serverFirestoreCode.includes('[1;31mSERVER_AUTH_SECRET[m'), "lib/server-firestore.ts must NOT use [1;31mSERVER_AUTH_SECRET[m");
+[35mscripts/test_live_security_audit.mjs[m[36m:[m[32m109[m[36m:[m      '[1;31mSERVER_AUTH_SECRET[m',
+[35mscripts/test_live_security_audit.mjs[m[36m:[m[32m110[m[36m:[m      '[1;31mFIRESTORE_SERVER_SECRET[m',
+[35mscripts/test_live_security_audit.mjs[m[36m:[m[32m124[m[36m:[m      details: 'Zero serverAuthToken, [1;31mSERVER_AUTH_SECRET[m, or serverDeleteToken found across codebase and rules.',

@@ -112,5 +112,17 @@ service cloud.firestore {
         allow delete: if false;
       }
     }
+
+    // Memories collection
+    // Client can only read memories they own. Direct writes/mutations are disabled
+    // since creation is handled exclusively server-side via the Admin SDK.
+    match /memories/{memoryId} {
+      allow read: if isSignedIn()
+        && resource.data.ownerId == request.auth.uid;
+
+      allow create: if false;
+      allow update: if false;
+      allow delete: if false;
+    }
   }
 }
