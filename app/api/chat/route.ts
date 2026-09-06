@@ -9,7 +9,11 @@ import {
   persistMessage,
   getConversationHistory,
 } from '@/lib/server-firestore';
-import { evaluateSafetyGate, FIXED_SAFETY_RESPONSE } from '@/lib/safety-gate';
+import {
+  evaluateSafetyGate,
+  FIXED_SAFETY_RESPONSE,
+  CONCERNING_DISTRESS_RESPONSE,
+} from '@/lib/safety-gate';
 import { evaluateIntervention, getSafeAckResponse } from '@/lib/selective-intervention';
 
 const ID_REGEX = /^[a-zA-Z0-9_-]{1,128}$/;
@@ -170,6 +174,57 @@ export async function POST(req: NextRequest) {
           createdAt: new Date().toISOString(),
         },
         safetyGateTriggered: true,
+      });
+    }
+
+    if (safetyCheck.classification === 'CONCERNING_DISTRESS') {
+      // 1. Persist the user's journal entry so their thought is not lost
+      await persistMessage(
+        conversationId,
+        verifiedUser.uid,
+        'user',
+        message.trim(),
+        cleanUserMessageId
+      );
+
+      // 2. Persist the warm, supportive, non-engaging acknowledgment (Zero-LLM generated)
+      const assistantMessageId = `msg_${crypto.randomUUID()}`;
+      await persistMessage(
+        conversationId,
+        verifiedUser.uid,
+        'assistant',
+        CONCERNING_DISTRESS_RESPONSE,
+        assistantMessageId
+      );
+
+      // 3. Update conversation timestamp
+      await updateConversationTimestamp(conversationId, verifiedUser.uid);
+
+      // 4. Structured Operational Logging (Zero-PII: ZERO crisis text or keywords in logs)
+      const latencyMs = Date.now() - startTime;
+      console.info(JSON.stringify({
+        event: 'concerning_distress_triggered',
+        requestId,
+        uidPrefix: verifiedUser.uid.slice(0, 8),
+        conversationId: conversationId.slice(0, 16),
+        triggerCategory: safetyCheck.triggerCategory,
+        latencyMs,
+        status: 200,
+      }));
+
+      // 5. Return supportive response immediately. Gemini, memory reflection, and selective intervention are completely skipped.
+      return NextResponse.json({
+        success: true,
+        conversationId,
+        userMessageId: cleanUserMessageId,
+        assistantMessage: {
+          id: assistantMessageId,
+          role: 'assistant',
+          content: CONCERNING_DISTRESS_RESPONSE,
+          createdAt: new Date().toISOString(),
+        },
+        safetyGateTriggered: false,
+        concerningDistressTriggered: true,
       });
     }
 
