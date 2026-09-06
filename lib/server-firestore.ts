@@ -43,11 +43,21 @@ export async function authorizeConversation(
   }
 
   if (!response.ok) {
-    if (response.status === 403 || response.status === 401) {
-      throw new Error('FORBIDDEN: You do not have permission to access this journal page.');
-    }
-    throw new Error(`Firestore query failed with status ${response.status}`);
+  const errorBody = await response.text();
+
+  console.error('[Firestore REST] request failed', {
+    status: response.status,
+    statusText: response.statusText,
+    url,
+    body: errorBody,
+  });
+
+  if (response.status === 403 || response.status === 401) {
+    throw new Error('FORBIDDEN: You do not have permission to access this journal page.');
   }
+
+  throw new Error(`Firestore query failed with status ${response.status}`);
+}
 
   const doc = await response.json();
   const ownerId = doc.fields?.ownerId?.stringValue;

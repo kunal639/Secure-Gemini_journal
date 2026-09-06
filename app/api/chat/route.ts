@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { verifyRequestAuth, AuthenticationError } from '@/lib/server-auth';
 import { checkPreAuthRateLimit, checkRateLimit } from '@/lib/rate-limiter';
+import { adminDb } from '@/lib/firebase-admin';
 import {
   authorizeConversation,
   createConversation,
@@ -10,13 +11,14 @@ import {
   getConversationHistory,
 } from '@/lib/server-firestore';
 import { evaluateSafetyGate, FIXED_SAFETY_RESPONSE } from '@/lib/safety-gate';
-
+console.log('[Firebase Admin] IMPORTED adminDb:', !!adminDb);
 const ID_REGEX = /^[a-zA-Z0-9_-]{1,128}$/;
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_PAYLOAD_SIZE = 64 * 1024; // 64 KB
 const MAX_HISTORY_MESSAGES = 20;
 
 export async function POST(req: NextRequest) {
+  console.log('[Firebase Admin] route reached');
   const startTime = Date.now();
   const requestId = crypto.randomUUID();
 

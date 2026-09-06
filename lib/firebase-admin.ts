@@ -11,3 +11,6 @@ const adminApp =
 
 export const adminAuth = getAuth(adminApp);
 export const adminDb = getFirestore(adminApp);
+
+console.log('[Firebase Admin] initialized successfully');
+console.log('[Firebase Admin] projectId:', adminApp.options.projectId);
