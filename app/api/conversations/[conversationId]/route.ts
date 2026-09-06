@@ -63,7 +63,7 @@ export async function DELETE(
     }
 
     // 5. Authorize ownership before deleting
-    const existing = await authorizeConversation(conversationId, verifiedUser.uid, idToken);
+    const existing = await authorizeConversation(conversationId, verifiedUser.uid);
     if (!existing) {
       return NextResponse.json(
         { error: 'Conversation not found' },
@@ -72,7 +72,7 @@ export async function DELETE(
     }
 
     // 6. True cascade deletion (deletes all subcollection messages first, then parent conversation)
-    const result = await deleteConversationCascade(conversationId, verifiedUser.uid, idToken);
+    const result = await deleteConversationCascade(conversationId, verifiedUser.uid);
 
     console.info(JSON.stringify({
       event: 'conversation_cascade_deleted',

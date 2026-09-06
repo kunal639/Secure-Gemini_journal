@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 import { verifyRequestAuth, AuthenticationError } from '@/lib/server-auth';
 import { checkPreAuthRateLimit, checkRateLimit } from '@/lib/rate-limiter';
-import { adminDb } from '@/lib/firebase-admin';
 import {
   authorizeConversation,
   createConversation,
@@ -11,14 +10,13 @@ import {
   getConversationHistory,
 } from '@/lib/server-firestore';
 import { evaluateSafetyGate, FIXED_SAFETY_RESPONSE } from '@/lib/safety-gate';
-console.log('[Firebase Admin] IMPORTED adminDb:', !!adminDb);
+
 const ID_REGEX = /^[a-zA-Z0-9_-]{1,128}$/;
 const MAX_MESSAGE_LENGTH = 10000;
 const MAX_PAYLOAD_SIZE = 64 * 1024; // 64 KB
 const MAX_HISTORY_MESSAGES = 20;
 
 export async function POST(req: NextRequest) {
-  console.log('[Firebase Admin] route reached');
   const startTime = Date.now();
   const requestId = crypto.randomUUID();
 
@@ -51,7 +49,6 @@ export async function POST(req: NextRequest) {
     // 3. Authenticate Request & Derive User Identity
     const authHeader = req.headers.get('authorization');
     const verifiedUser = await verifyRequestAuth(authHeader);
-    const idToken = authHeader!.trim().split(' ')[1];
 
     // 4. Abuse Protection / Rate Limiting per Authenticated UID
     const userRateLimit = checkRateLimit(verifiedUser.uid);
@@ -105,15 +102,15 @@ export async function POST(req: NextRequest) {
     const cleanUserMessageId =
       userMessageId && typeof userMessageId === 'string' && ID_REGEX.test(userMessageId)
         ? userMessageId
-        : `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        : `msg_${crypto.randomUUID()}`;
 
     // 6. Authorize Conversation Ownership (Prevent IDOR)
-    const existingConversation = await authorizeConversation(conversationId, verifiedUser.uid, idToken);
+    const existingConversation = await authorizeConversation(conversationId, verifiedUser.uid);
     const isNewConversation = !existingConversation;
 
     if (isNewConversation) {
       const generatedTitle = message.trim().split('\n')[0].slice(0, 50) || 'New Journal Entry';
-      await createConversation(conversationId, verifiedUser.uid, generatedTitle, idToken);
+      await createConversation(conversationId, verifiedUser.uid, generatedTitle);
     }
 
     // 7. GLOBAL SAFETY GATE (Pre-Gemini & Pre-Context Evaluation)
@@ -129,26 +126,24 @@ export async function POST(req: NextRequest) {
       // 1. Persist the user's journal entry so their thought is not lost
       await persistMessage(
         conversationId,
-        cleanUserMessageId,
         verifiedUser.uid,
         'user',
         message.trim(),
-        idToken
+        cleanUserMessageId
       );
 
       // 2. Persist the fixed, human-reviewed safety response (Zero-LLM generated)
-      const assistantMessageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      const assistantMessageId = `msg_${crypto.randomUUID()}`;
       await persistMessage(
         conversationId,
-        assistantMessageId,
         verifiedUser.uid,
         'assistant',
         FIXED_SAFETY_RESPONSE,
-        idToken
+        assistantMessageId
       );
 
       // 3. Update conversation timestamp
-      await updateConversationTimestamp(conversationId, idToken);
+      await updateConversationTimestamp(conversationId, verifiedUser.uid);
 
       // 4. Structured Operational Logging (Zero-PII: ZERO crisis text or keywords in logs)
       const latencyMs = Date.now() - startTime;
@@ -184,7 +179,6 @@ export async function POST(req: NextRequest) {
       storedHistory = await getConversationHistory(
         conversationId,
         verifiedUser.uid,
-        idToken,
         MAX_HISTORY_MESSAGES
       );
     }
@@ -204,11 +198,10 @@ export async function POST(req: NextRequest) {
     // 9. Persist the User's Journal Entry to Firestore
     await persistMessage(
       conversationId,
-      cleanUserMessageId,
       verifiedUser.uid,
       'user',
       message.trim(),
-      idToken
+      cleanUserMessageId
     );
 
     // 10. Invoke Gemini Server-Side via @google/genai
@@ -273,18 +266,17 @@ Guidelines:
     }
 
     // 10. FIX 2: Persist Assistant Response via Server-Authoritative Path
-    const assistantMessageId = `msg_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const assistantMessageId = `msg_${crypto.randomUUID()}`;
     await persistMessage(
       conversationId,
-      assistantMessageId,
       verifiedUser.uid,
       'assistant',
       cleanedAssistantText,
-      idToken
+      assistantMessageId
     );
 
     // Update conversation timestamp
-    await updateConversationTimestamp(conversationId, idToken);
+    await updateConversationTimestamp(conversationId, verifiedUser.uid);
 
     // 11. Structured Operational Logging (Zero-PII, no journal content logged)
     const latencyMs = Date.now() - startTime;

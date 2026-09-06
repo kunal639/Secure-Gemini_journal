@@ -193,7 +193,7 @@ async function runSuite() {
   try {
     const serverFirestoreCode = fs.readFileSync(path.resolve('./lib/server-firestore.ts'), 'utf-8');
     assert(serverFirestoreCode.includes('deleteConversationCascade'), 'lib/server-firestore.ts must export deleteConversationCascade');
-    assert(serverFirestoreCode.includes('/messages?pageSize='), 'deleteConversationCascade must query and delete subcollection messages');
+    assert(serverFirestoreCode.includes("collection('messages')") || serverFirestoreCode.includes('/messages'), 'deleteConversationCascade must query and delete subcollection messages');
 
     const convsRouteCode = fs.readFileSync(path.resolve('./app/api/conversations/route.ts'), 'utf-8');
     assert(convsRouteCode.includes('export async function DELETE'), 'app/api/conversations/route.ts must export DELETE handler');
